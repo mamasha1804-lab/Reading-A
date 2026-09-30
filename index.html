@@ -16,15 +16,26 @@
 const groups={short:['cat','fat','hat','bat','cap','black','can','hand','man','Dan','and','have','ant','has','Pam'],long:['cake','snake','lake','plane','Jane','name','plate','Dave']};
 const $=id=>document.getElementById(id);let deck=[],index=0,points=0,answered=false,voice=null,desktopVoice=null;
 const mobileAudio=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+const correctedWords=new Set(['fat','hat','hand','have','has','Pam','lake','plane','Jane','plate']);
+const recordedAudio=new Map();let desktopClip=null;
+if(!mobileAudio){for(const word of correctedWords){fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(word))
+  .then(response=>response.ok?response.json():null)
+  .then(entries=>{const clips=entries?.flatMap(entry=>entry.phonetics||[]).filter(item=>item.audio?.startsWith('https://'))||[];
+    const british=clips.find(item=>/-uk(?:[.-]|$)|_gb_/i.test(item.audio));const chosen=british||clips[0];
+    if(chosen)recordedAudio.set(word,chosen.audio)})
+  .catch(()=>{})}}
 function chooseVoice(){const all=speechSynthesis.getVoices();voice=all.find(v=>v.lang==='en-GB')||all.find(v=>v.lang.startsWith('en'))||null;
   const british=all.filter(v=>v.lang.toLowerCase()==='en-gb');
   desktopVoice=british.find(v=>/Google UK English Female|Microsoft Sonia|Microsoft Libby|Microsoft Ryan|Daniel|Serena/i.test(v.name))
     ||british.find(v=>/Google|Microsoft|Natural|Enhanced/i.test(v.name))
     ||british[0]||all.find(v=>v.lang.startsWith('en'))||null;
 }if('speechSynthesis'in window){chooseVoice();speechSynthesis.addEventListener('voiceschanged',chooseVoice)}
-function say(word){if(!('speechSynthesis'in window)){showAudioNotice();return}speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(word);
+function speakDesktop(word){chooseVoice();const utterance=new SpeechSynthesisUtterance(word);utterance.lang=desktopVoice?.lang||'en-GB';if(desktopVoice)utterance.voice=desktopVoice;utterance.rate=.95;utterance.pitch=1;speechSynthesis.speak(utterance)}
+function say(word){if(!('speechSynthesis'in window)){showAudioNotice();return}speechSynthesis.cancel();if(desktopClip){desktopClip.pause();desktopClip.currentTime=0;desktopClip=null}const utterance=new SpeechSynthesisUtterance(word);
   if(mobileAudio){utterance.lang=voice?.lang||'en-GB';if(voice)utterance.voice=voice;utterance.rate=.82;utterance.pitch=1;speechSynthesis.speak(utterance);return}
-  chooseVoice();utterance.lang=desktopVoice?.lang||'en-GB';if(desktopVoice)utterance.voice=desktopVoice;utterance.rate=.95;utterance.pitch=1;speechSynthesis.speak(utterance)
+  const url=recordedAudio.get(word);
+  if(url){const clip=new Audio(url);desktopClip=clip;clip.onended=()=>{if(desktopClip===clip)desktopClip=null};clip.onerror=()=>{if(desktopClip===clip){desktopClip=null;speakDesktop(word)}};clip.play().catch(()=>{if(desktopClip===clip){desktopClip=null;speakDesktop(word)}});return}
+  speakDesktop(word)
 }
 function showAudioNotice(){$('feedback').textContent='Озвучка недоступна в этом браузере.'}
 for(const [sound,words] of Object.entries(groups)){const box=$(sound==='short'?'shortWords':'longWords');words.forEach(word=>{const b=document.createElement('button');b.className='word';b.type='button';b.textContent='🔊 '+word;b.addEventListener('click',()=>say(word));box.append(b)})}
