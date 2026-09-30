@@ -14,9 +14,18 @@
 <section class="panel play-card hidden" id="play" role="tabpanel" aria-labelledby="playTab"><div id="round"><div class="progress" id="progress"></div><div class="bigword" id="currentWord"></div><button class="button speak" id="hear" type="button">🔊 Послушать слово</button><div class="targets"><button class="target" data-sound="short" type="button">A · /æ/<small>как в cat</small></button><button class="target" data-sound="long" type="button">A · /eɪ/<small>как в cake</small></button></div><div class="feedback" id="feedback" role="status" aria-live="polite"></div><button class="button hidden" id="next" type="button">Следующее слово →</button></div><div class="end hidden" id="end"><strong>Отлично! ⭐</strong><p id="result"></p><button class="button" id="again" type="button">Сыграть ещё раз</button></div></section></main>
 <script>
 const groups={short:['cat','fat','hat','bat','cap','black','can','hand','man','Dan','and','have','ant','has','Pam'],long:['cake','snake','lake','plane','Jane','name','plate','Dave']};
-const $=id=>document.getElementById(id);let deck=[],index=0,points=0,answered=false,voice=null;
-function chooseVoice(){const all=speechSynthesis.getVoices();voice=all.find(v=>v.lang==='en-GB')||all.find(v=>v.lang.startsWith('en'))||null}if('speechSynthesis'in window){chooseVoice();speechSynthesis.addEventListener('voiceschanged',chooseVoice)}
-function say(word){if(!('speechSynthesis'in window)){showAudioNotice();return}speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(word);utterance.lang=voice?.lang||'en-GB';if(voice)utterance.voice=voice;utterance.rate=.82;utterance.pitch=1;speechSynthesis.speak(utterance)}
+const $=id=>document.getElementById(id);let deck=[],index=0,points=0,answered=false,voice=null,desktopVoice=null;
+const mobileAudio=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+function chooseVoice(){const all=speechSynthesis.getVoices();voice=all.find(v=>v.lang==='en-GB')||all.find(v=>v.lang.startsWith('en'))||null;
+  const british=all.filter(v=>v.lang.toLowerCase()==='en-gb');
+  desktopVoice=british.find(v=>/Google UK English Female|Microsoft Sonia|Microsoft Libby|Microsoft Ryan|Daniel|Serena/i.test(v.name))
+    ||british.find(v=>/Google|Microsoft|Natural|Enhanced/i.test(v.name))
+    ||british[0]||all.find(v=>v.lang.startsWith('en'))||null;
+}if('speechSynthesis'in window){chooseVoice();speechSynthesis.addEventListener('voiceschanged',chooseVoice)}
+function say(word){if(!('speechSynthesis'in window)){showAudioNotice();return}speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(word);
+  if(mobileAudio){utterance.lang=voice?.lang||'en-GB';if(voice)utterance.voice=voice;utterance.rate=.82;utterance.pitch=1;speechSynthesis.speak(utterance);return}
+  chooseVoice();utterance.lang=desktopVoice?.lang||'en-GB';if(desktopVoice)utterance.voice=desktopVoice;utterance.rate=.95;utterance.pitch=1;speechSynthesis.speak(utterance)
+}
 function showAudioNotice(){$('feedback').textContent='Озвучка недоступна в этом браузере.'}
 for(const [sound,words] of Object.entries(groups)){const box=$(sound==='short'?'shortWords':'longWords');words.forEach(word=>{const b=document.createElement('button');b.className='word';b.type='button';b.textContent='🔊 '+word;b.addEventListener('click',()=>say(word));box.append(b)})}
 function showTab(which){const playing=which==='play';$('learn').classList.toggle('hidden',playing);$('play').classList.toggle('hidden',!playing);$('learnTab').setAttribute('aria-selected',String(!playing));$('playTab').setAttribute('aria-selected',String(playing));window.speechSynthesis?.cancel();if(playing&&!deck.length)start()}
