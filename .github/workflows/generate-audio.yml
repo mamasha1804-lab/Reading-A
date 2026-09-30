@@ -16,6 +16,7 @@ jobs:
           python-version: '3.11'
       - run: pip install piper-tts
       - run: python -m piper.download_voices en_GB-alan-medium
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Render clear British pronunciations
         shell: bash
         run: |
